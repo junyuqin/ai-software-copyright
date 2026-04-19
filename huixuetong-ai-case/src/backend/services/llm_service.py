@@ -19,11 +19,10 @@ class LLMService:
     def __init__(self, api_key: str = None, secret_key: str = None,
                  token_url: str = None, chat_url: str = None):
         # 从参数或环境变量读取配置（禁止硬编码）
-        from config import Config
-        self.api_key = api_key or Config.BAIDU_API_KEY
-        self.secret_key = secret_key or Config.BAIDU_SECRET_KEY
-        self.token_url = token_url or Config.BAIDU_TOKEN_URL
-        self.chat_url = chat_url or Config.BAIDU_CHAT_URL
+        self.api_key = api_key or os.getenv('BAIDU_API_KEY', '')
+        self.secret_key = secret_key or os.getenv('BAIDU_SECRET_KEY', '')
+        self.token_url = token_url or os.getenv('LLM_TOKEN_URL', 'https://aip.baidubce.com/oauth/2.0/token')
+        self.chat_url = chat_url or os.getenv('LLM_CHAT_URL', 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions')
         
         # Token 缓存（内存级，生产环境可改用 Redis）
         self._access_token: Optional[str] = None

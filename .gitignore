@@ -1,42 +1,26 @@
 ```
+# Compressed files
+*.tar.gz
+
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 venv/
-env/
-ENV/
 .venv/
-.env/
-
-# Logs
-*.log
-
-# Environment
 .env
 .env.local
 .env.*
 
-# Docker
-Dockerfile
-docker-compose.yml
+# Logs
+*.log
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
 
 # IDE
 .vscode/
@@ -49,17 +33,8 @@ docker-compose.yml
 .DS_Store
 Thumbs.db
 
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# MyPy
-.mypy_cache/
-
-# Pytest
-.pytest_cache/
-
 # Build
-target/
+build/
+dist/
+*.egg-info/
 ```

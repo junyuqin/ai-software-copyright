@@ -1,11 +1,13 @@
 """
 慧学通 (HuiXueTong) - 学情智能分析信息系统后端主入口
-功能：路由定义、CORS 配置、异常处理、健康检查
+功能：路由定义、CORS 配置、异常处理、健康检查、SQLite3 数据库集成
 申报映射：智能信息系统 - 数据分析/策略辅助/内容生成
 """
 import os
+import json
+import sqlite3
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 from services.llm_service import LLMService
@@ -22,14 +24,97 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 初始化 Flask 应用
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 app.config['JSON_AS_ASCII'] = False  # 支持中文 JSON 响应
 
 # 配置 CORS，允许前端跨域访问
 CORS(app, origins=os.getenv('CORS_ORIGINS', '*').split(','))
 
+# 数据库路径
+DB_PATH = os.getenv('SQLITE_DB_PATH', 'data/huixuetong.db')
+
+# 确保数据目录存在
+os.makedirs(os.path.dirname(DB_PATH) if os.path.dirname(DB_PATH) else '.', exist_ok=True)
+
 # 初始化大模型服务
 llm_service = LLMService()
+
+
+def get_db_connection():
+    """获取数据库连接"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    """初始化数据库（如果不存在）"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 创建表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS students (
+            uuid TEXT PRIMARY KEY,
+            student_id TEXT,
+            name TEXT,
+            class TEXT NOT NULL,
+            major TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS behavior_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT NOT NULL,
+            week INTEGER NOT NULL,
+            attendance REAL DEFAULT 0.8,
+            quiz_avg REAL DEFAULT 70.0,
+            debug_success REAL DEFAULT 0.5,
+            project_score REAL DEFAULT 70.0,
+            pep8_score REAL DEFAULT 70.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ability_profile (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT NOT NULL,
+            week INTEGER NOT NULL,
+            knowledge_score REAL DEFAULT 0.0,
+            skill_score REAL DEFAULT 0.0,
+            literacy_score REAL DEFAULT 0.0,
+            diagnosis TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS warning_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT NOT NULL,
+            rule_name TEXT NOT NULL,
+            priority TEXT DEFAULT 'medium',
+            message TEXT,
+            status TEXT DEFAULT 'pending',
+            triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_uuid_week ON behavior_data(uuid, week)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_profile_uuid_week ON ability_profile(uuid, week)')
+    
+    conn.commit()
+    conn.close()
+    logger.info("数据库初始化完成")
+
+
+@app.route('/')
+def index():
+    """前端首页"""
+    return send_from_directory(app.static_folder, 'index.html')
 
 
 @app.route('/health', methods=['GET'])
@@ -38,7 +123,20 @@ def health_check():
     健康检查接口
     用于 Docker 健康检查和系统状态监控
     """
-    return jsonify({"status": "ok"})
+    try:
+        # 检查数据库连接
+        conn = get_db_connection()
+        conn.execute("SELECT 1")
+        conn.close()
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return jsonify({
+        "status": "ok",
+        "database": db_status,
+        "version": "1.0.0"
+    })
 
 
 @app.route('/api/profile/<uuid>', methods=['GET'])
@@ -46,19 +144,45 @@ def get_profile(uuid):
     """
     获取学生三维能力画像
     参数：uuid - 学生唯一标识（已脱敏）
-    返回：知识/技能/素养三维得分
+    返回：知识/技能/素养三维得分及详细信息
     申报映射：多源数据融合与三维画像计算
     """
     try:
-        # 模拟从数据库获取学生行为数据
-        # 实际场景中应从 SQLite 查询 behavior_data 表
-        mock_data = {
-            'attendance': 0.95,      # 出勤率
-            'quiz_avg': 78.5,        # 测验平均分
-            'debug_success': 0.72,   # 调试成功率
-            'project_score': 85.0,   # 项目评分
-            'pep8_score': 8.5        # PEP8 规范得分 (0-10)
-        }
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询最新一周的行为数据
+        cursor.execute('''
+            SELECT uuid, week, attendance, quiz_avg, debug_success, project_score, pep8_score
+            FROM behavior_data
+            WHERE uuid = ?
+            ORDER BY week DESC
+            LIMIT 1
+        ''', (uuid,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            # 从数据库获取真实数据
+            mock_data = {
+                'attendance': float(row['attendance']),
+                'quiz_avg': float(row['quiz_avg']),
+                'debug_success': float(row['debug_success']),
+                'project_score': float(row['project_score']),
+                'pep8_score': float(row['pep8_score'])
+            }
+            week = row['week']
+        else:
+            # 如果没有数据，使用模拟数据
+            mock_data = {
+                'attendance': 0.95,
+                'quiz_avg': 78.5,
+                'debug_success': 0.72,
+                'project_score': 85.0,
+                'pep8_score': 8.5
+            }
+            week = 12
         
         # 计算三维得分
         knowledge, skill, literacy = calc_3d_scores(mock_data)
@@ -69,7 +193,7 @@ def get_profile(uuid):
             "knowledge_score": round(knowledge, 1),
             "skill_score": round(skill, 1),
             "literacy_score": round(literacy, 1),
-            "week": 12,
+            "week": week,
             "class": "计算机应用 2201 班",
             "major": "计算机应用"
         })
@@ -77,6 +201,94 @@ def get_profile(uuid):
     except Exception as e:
         logger.error(f"获取画像失败：{str(e)}")
         return jsonify({"error": "获取画像失败", "code": 500}), 500
+
+
+@app.route('/api/profiles', methods=['GET'])
+def get_all_profiles():
+    """
+    获取所有学生的三维能力画像列表
+    返回：班级所有学生的画像摘要
+    申报映射：数据可视化/学情看板
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询所有学生的最新画像
+        cursor.execute('''
+            SELECT ap.uuid, ap.week, ap.knowledge_score, ap.skill_score, ap.literacy_score,
+                   s.name, s.class, s.major
+            FROM ability_profile ap
+            LEFT JOIN students s ON ap.uuid = s.uuid
+            WHERE ap.week = (SELECT MAX(week) FROM ability_profile)
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        profiles = []
+        for row in rows:
+            profiles.append({
+                "uuid": row['uuid'],
+                "name": row['name'] or '未知',
+                "class": row['class'] or '未知班级',
+                "major": row['major'] or '未知专业',
+                "knowledge_score": round(row['knowledge_score'], 1),
+                "skill_score": round(row['skill_score'], 1),
+                "literacy_score": round(row['literacy_score'], 1)
+            })
+        
+        return jsonify({
+            "profiles": profiles,
+            "total": len(profiles)
+        })
+    
+    except Exception as e:
+        logger.error(f"获取画像列表失败：{str(e)}")
+        return jsonify({"error": "获取画像列表失败", "code": 500}), 500
+
+
+@app.route('/api/growth/<uuid>', methods=['GET'])
+def get_growth_history(uuid):
+    """
+    获取学生成长轨迹（历史数据）
+    参数：uuid - 学生唯一标识
+    返回：多周的能力得分变化趋势
+    申报映射：数据可视化/成长档案
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询历史画像数据
+        cursor.execute('''
+            SELECT week, knowledge_score, skill_score, literacy_score
+            FROM ability_profile
+            WHERE uuid = ?
+            ORDER BY week ASC
+        ''', (uuid,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        history = []
+        for row in rows:
+            history.append({
+                "week": row['week'],
+                "knowledge_score": round(row['knowledge_score'], 1),
+                "skill_score": round(row['skill_score'], 1),
+                "literacy_score": round(row['literacy_score'], 1)
+            })
+        
+        return jsonify({
+            "uuid": hash_student_id(uuid),
+            "history": history,
+            "total_weeks": len(history)
+        })
+    
+    except Exception as e:
+        logger.error(f"获取成长轨迹失败：{str(e)}")
+        return jsonify({"error": "获取成长轨迹失败", "code": 500}), 500
 
 
 @app.route('/api/diagnosis', methods=['POST'])
@@ -129,32 +341,51 @@ def get_warnings():
     申报映射：零代码预警规则引擎
     """
     try:
-        # 模拟从数据库获取预警记录
-        # 实际场景中应读取 warning_rules.json 并匹配学生数据
-        mock_warnings = [
-            {
-                "id": 1,
-                "rule_name": "技能薄弱预警",
-                "priority": "high",
-                "trigger_time": "2024-01-15T09:00:00+08:00",
-                "student_uuid": "a1b2c3d4...",
-                "message": "技能得分低于 60 且调试尝试次数超过 8 次",
-                "intervention": "推送 Python 调试技巧微课"
-            },
-            {
-                "id": 2,
-                "rule_name": "出勤率预警",
-                "priority": "medium",
-                "trigger_time": "2024-01-14T14:30:00+08:00",
-                "student_uuid": "e5f6g7h8...",
-                "message": "连续 3 周出勤率低于 80%",
-                "intervention": "通知班主任跟进"
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询所有预警记录
+        cursor.execute('''
+            SELECT id, uuid, rule_name, priority, message, status, triggered_at
+            FROM warning_records
+            ORDER BY 
+                CASE priority 
+                    WHEN 'high' THEN 1 
+                    WHEN 'medium' THEN 2 
+                    WHEN 'low' THEN 3 
+                    ELSE 4 
+                END,
+                triggered_at DESC
+            LIMIT 50
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        warnings = []
+        for row in rows:
+            intervention_map = {
+                "技能薄弱预警": "推送调试技巧微课",
+                "出勤率预警": "通知班主任跟进",
+                "知识掌握不足": "推送基础知识点复习材料",
+                "素养待提升": "通知任课教师关注学习态度",
+                "综合优秀表彰": "推送进阶挑战任务"
             }
-        ]
+            
+            warnings.append({
+                "id": row['id'],
+                "rule_name": row['rule_name'],
+                "priority": row['priority'],
+                "trigger_time": row['triggered_at'],
+                "student_uuid": hash_student_id(row['uuid']),
+                "message": row['message'] or f"{row['rule_name']}触发条件满足",
+                "intervention": intervention_map.get(row['rule_name'], "人工评估后处理"),
+                "status": row['status']
+            })
         
         return jsonify({
-            "warnings": mock_warnings,
-            "total": len(mock_warnings)
+            "warnings": warnings,
+            "total": len(warnings)
         })
     
     except Exception as e:
@@ -176,13 +407,35 @@ def record_intervention():
         if not data:
             return jsonify({"error": "请求数据为空", "code": 400}), 400
         
-        required_fields = ['student_uuid', 'intervention_type']
+        required_fields = ['warning_id', 'action_type']
         for field in required_fields:
             if field not in data:
                 return jsonify({"error": f"缺少必要参数：{field}", "code": 400}), 400
         
-        # 模拟写入数据库
-        intervention_id = 1001  # 实际应为数据库自增 ID
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 插入干预记录
+        cursor.execute('''
+            INSERT INTO intervention_log (warning_id, action_type, action_detail, operator)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            data['warning_id'],
+            data['action_type'],
+            data.get('action_detail', ''),
+            data.get('operator', 'system')
+        ))
+        
+        # 更新预警状态
+        cursor.execute('''
+            UPDATE warning_records 
+            SET status = 'processed', processed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (data['warning_id'],))
+        
+        intervention_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
         
         return jsonify({
             "intervention_id": intervention_id,
@@ -193,6 +446,53 @@ def record_intervention():
     except Exception as e:
         logger.error(f"记录干预失败：{str(e)}")
         return jsonify({"error": "记录干预失败", "code": 500}), 500
+
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    """
+    文件上传接口（代码提交、作业上传）
+    支持 .py, .js, .html, .css, .json 等文件
+    申报映射：多源数据采集
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "未找到上传文件", "code": 400}), 400
+        
+        file = request.files['file']
+        student_uuid = request.form.get('uuid', 'unknown')
+        assignment_id = request.form.get('assignment_id', '')
+        
+        if file.filename == '':
+            return jsonify({"error": "文件名为空", "code": 400}), 400
+        
+        # 检查文件扩展名
+        allowed_extensions = {'py', 'js', 'html', 'css', 'json', 'txt', 'md'}
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        
+        if ext not in allowed_extensions:
+            return jsonify({"error": f"不支持的文件类型：.{ext}", "code": 400}), 400
+        
+        # 保存文件（实际项目中应保存到对象存储或专门目录）
+        upload_dir = os.path.join(os.path.dirname(DB_PATH), 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        safe_filename = f"{hash_student_id(student_uuid)}_{assignment_id}_{file.filename}"
+        file_path = os.path.join(upload_dir, safe_filename)
+        file.save(file_path)
+        
+        logger.info(f"文件上传成功：{safe_filename}")
+        
+        return jsonify({
+            "success": True,
+            "filename": safe_filename,
+            "size": os.path.getsize(file_path),
+            "upload_time": datetime.now().isoformat()
+        })
+    
+    except Exception as e:
+        logger.error(f"文件上传失败：{str(e)}")
+        return jsonify({"error": "文件上传失败", "code": 500}), 500
 
 
 @app.errorhandler(404)
@@ -214,7 +514,13 @@ def handle_exception(error):
     return jsonify({"error": "系统异常", "code": 500}), 500
 
 
+# 导入 datetime 用于文件上传时间戳
+from datetime import datetime
+
 if __name__ == '__main__':
+    # 初始化数据库
+    init_db()
+    
     # 从环境变量获取配置
     host = os.getenv('FLASK_HOST', '0.0.0.0')
     port = int(os.getenv('FLASK_PORT', 5000))

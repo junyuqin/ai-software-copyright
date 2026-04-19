@@ -1,58 +1,42 @@
-# 慧学通项目 .gitignore
-# 禁止提交敏感配置与构建产物
-
-# ==================== 环境变量 ====================
+# 环境变量文件（包含敏感信息）
 .env
-.env.local
-.env.*.local
+*.env
 
-# ==================== Python ====================
+# Python 缓存
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# ==================== IDE ====================
+# 虚拟环境
+venv/
+env/
+ENV/
+
+# IDE 配置
 .idea/
 .vscode/
 *.swp
 *.swo
-*~
 
-# ==================== 测试与日志 ====================
-.pytest_cache/
-.coverage
-htmlcov/
+# SQLite 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 日志文件
 *.log
 logs/
 
-# ==================== Docker ====================
-.docker/
+# Docker 卷数据
+data/*.db
 
-# ==================== 前端构建产物 ====================
-src/frontend/dist/
-src/frontend/node_modules/
-
-# ==================== 数据库 ====================
-*.db
-*.sqlite3
-
-# ==================== 系统文件 ====================
+# 操作系统文件
 .DS_Store
 Thumbs.db
+
+# 临时文件
+tmp/
+temp/
+*.tmp

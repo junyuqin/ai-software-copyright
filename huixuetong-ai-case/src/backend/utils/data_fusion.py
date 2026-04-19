@@ -8,7 +8,26 @@ import hashlib
 from typing import Dict, Tuple, Any
 
 
-def calc_3d_scores(data: Dict[str, Any]) -> Tuple[float, float, float]:
+# 三维得分计算权重配置（可外部调整）
+WEIGHTS = {
+    'knowledge': {
+        'quiz_avg': 0.5,
+        'attendance': 0.3,
+        'base': 12
+    },
+    'skill': {
+        'debug_success': 0.6,
+        'project_score': 0.4
+    },
+    'literacy': {
+        'attendance': 0.4,
+        'pep8_score': 0.3,
+        'base': 15
+    }
+}
+
+
+def calc_3d_scores(data: Dict[str, Any], weights: Dict = None) -> Tuple[float, float, float]:
     """
     计算学生知识-技能-素养三维能力得分
     
@@ -28,6 +47,10 @@ def calc_3d_scores(data: Dict[str, Any]) -> Tuple[float, float, float]:
     返回：
         (knowledge, skill, literacy) 三元组，保留1位小数
     """
+    # 使用默认权重或传入的权重
+    if weights is None:
+        weights = WEIGHTS
+    
     # 类型检查与默认值容错
     quiz_avg = float(data.get('quiz_avg', 70.0))
     attendance = float(data.get('attendance', 0.8))
@@ -42,10 +65,21 @@ def calc_3d_scores(data: Dict[str, Any]) -> Tuple[float, float, float]:
     project_score = max(0, min(100, project_score))
     pep8_score = max(0, min(100, pep8_score))
     
-    # 按预设权重计算三维得分
-    knowledge = 0.5 * quiz_avg + 0.3 * attendance * 100 + 12
-    skill = 0.6 * debug_success * 100 + 0.4 * project_score
-    literacy = 0.4 * attendance * 100 + 0.3 * pep8_score * 10 + 15
+    # 按配置的权重计算三维得分
+    knowledge = (
+        weights['knowledge']['quiz_avg'] * quiz_avg +
+        weights['knowledge']['attendance'] * attendance * 100 +
+        weights['knowledge'].get('base', 12)
+    )
+    skill = (
+        weights['skill']['debug_success'] * debug_success * 100 +
+        weights['skill']['project_score'] * project_score
+    )
+    literacy = (
+        weights['literacy']['attendance'] * attendance * 100 +
+        weights['literacy']['pep8_score'] * pep8_score * 10 +
+        weights['literacy'].get('base', 15)
+    )
     
     # 边界保护（确保得分在合理范围）
     knowledge = max(0, min(100, knowledge))

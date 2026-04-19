@@ -16,12 +16,14 @@ class LLMService:
     实现OAuth2鉴权、Token内存缓存、Prompt封装与异常降级
     """
     
-    def __init__(self):
-        # 从环境变量读取配置（禁止硬编码）
-        self.api_key = os.getenv('BAIDU_API_KEY', '')
-        self.secret_key = os.getenv('BAIDU_SECRET_KEY', '')
-        self.token_url = "https://aip.baidubce.com/oauth/2.0/token"
-        self.chat_url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions"
+    def __init__(self, api_key: str = None, secret_key: str = None,
+                 token_url: str = None, chat_url: str = None):
+        # 从参数或环境变量读取配置（禁止硬编码）
+        from config import Config
+        self.api_key = api_key or Config.BAIDU_API_KEY
+        self.secret_key = secret_key or Config.BAIDU_SECRET_KEY
+        self.token_url = token_url or Config.BAIDU_TOKEN_URL
+        self.chat_url = chat_url or Config.BAIDU_CHAT_URL
         
         # Token缓存（内存级，生产环境可改用Redis）
         self._access_token: Optional[str] = None

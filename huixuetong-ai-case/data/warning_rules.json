@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "description": "慧学通零代码预警规则配置模板",
+  "rules": [
+    {
+      "rule_id": "WR001",
+      "rule_name": "技能薄弱预警",
+      "description": "当学生技能得分低于60分且调试尝试次数过多时触发",
+      "condition": {
+        "field": "skill_score",
+        "operator": "<",
+        "value": 60,
+        "and": {
+          "field": "debug_attempts",
+          "operator": ">",
+          "value": 8
+        }
+      },
+      "priority": "high",
+      "intervention": {
+        "type": "resource_push",
+        "action": "推送调试技巧微课视频",
+        "notify": ["teacher"]
+      }
+    },
+    {
+      "rule_id": "WR002",
+      "rule_name": "知识掌握不足",
+      "description": "当学生知识维度得分低于65分时触发",
+      "condition": {
+        "field": "knowledge_score",
+        "operator": "<",
+        "value": 65
+      },
+      "priority": "medium",
+      "intervention": {
+        "type": "resource_push",
+        "action": "推送基础知识点复习材料",
+        "notify": ["teacher"]
+      }
+    },
+    {
+      "rule_id": "WR003",
+      "rule_name": "素养待提升",
+      "description": "当学生素养维度得分低于60分时触发",
+      "condition": {
+        "field": "literacy_score",
+        "operator": "<",
+        "value": 60
+      },
+      "priority": "medium",
+      "intervention": {
+        "type": "teacher_notify",
+        "action": "通知班主任关注学生学习态度",
+        "notify": ["teacher", "headmaster"]
+      }
+    },
+    {
+      "rule_id": "WR004",
+      "rule_name": "出勤率预警",
+      "description": "当学生出勤率低于80%时触发",
+      "condition": {
+        "field": "attendance",
+        "operator": "<",
+        "value": 0.8
+      },
+      "priority": "high",
+      "intervention": {
+        "type": "teacher_notify",
+        "action": "通知任课教师与班主任",
+        "notify": ["teacher", "headmaster"]
+      }
+    },
+    {
+      "rule_id": "WR005",
+      "rule_name": "综合优秀表彰",
+      "description": "当学生三维得分均高于85分时触发表彰",
+      "condition": {
+        "field": "knowledge_score",
+        "operator": ">=",
+        "value": 85,
+        "and": {
+          "field": "skill_score",
+          "operator": ">=",
+          "value": 85,
+          "and": {
+            "field": "literacy_score",
+            "operator": ">=",
+            "value": 85
+          }
+        }
+      },
+      "priority": "low",
+      "intervention": {
+        "type": "resource_push",
+        "action": "推送进阶挑战任务，颁发电子奖状",
+        "notify": ["teacher"]
+      }
+    }
+  ],
+  "global_settings": {
+    "scan_interval_minutes": 30,
+    "max_warnings_per_scan": 50,
+    "notification_channels": ["system", "email", "sms"]
+  }
+}

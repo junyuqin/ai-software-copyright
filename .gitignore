@@ -1,0 +1,48 @@
+```
+# Dependencies
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Logs
+*.log
+
+# Coverage reports
+.coverage
+htmlcov/
+.coverage.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker related
+.dockerenv
+Dockerfile
+docker-compose.yml
+
+# Python specific
+*.py[cod]
+*$py.class
+*.so
+.Python
+```

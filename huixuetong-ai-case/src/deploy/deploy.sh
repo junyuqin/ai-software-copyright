@@ -20,9 +20,9 @@ if [ ! -f ".env" ]; then
     echo "=========================================="
     echo "  ⚠️  请编辑 src/deploy/.env 文件"
     echo "  必须配置以下变量："
-    echo "  - DB_PASSWORD (数据库密码)"
-    echo "  - BAIDU_API_KEY (文心一言API Key)"
-    echo "  - BAIDU_SECRET_KEY (文心一言Secret Key)"
+    echo "  - BAIDU_API_KEY (文心一言 API Key)"
+    echo "  - BAIDU_SECRET_KEY (文心一言 Secret Key)"
+    echo "  注：如仅测试基础功能，可不配置 AI 密钥（将返回降级提示）"
     echo "=========================================="
     echo ""
     echo "修改完成后，请重新运行此脚本。"
@@ -35,7 +35,7 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+if ! docker compose version &> /dev/null && ! docker-compose version &> /dev/null; then
     echo "❌ 错误：未检测到 Docker Compose，请先安装"
     exit 1
 fi
@@ -44,75 +44,25 @@ echo "✅ Docker 环境检查通过"
 echo ""
 echo "[步骤 2/3] 创建前端占位目录..."
 mkdir -p ../frontend/dist
-# 创建简单的 index.html 用于测试
-cat > ../frontend/dist/index.html << 'EOF'
+
+# 如果没有 index.html，创建简单的占位页面
+if [ ! -f "../frontend/dist/index.html" ]; then
+cat > ../frontend/dist/index.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>慧学通 - 学情智能分析系统</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-        h1 { color: #1890ff; }
-        .status { margin: 20px 0; padding: 20px; background: #f0f9ff; border-radius: 8px; }
-        .api-test { margin-top: 30px; }
-        button { padding: 10px 20px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #40a9ff; }
-        #result { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 4px; text-align: left; }
-    </style>
+    <title>慧学通</title>
+    <style>body{font-family:Arial;text-align:center;padding:50px}h1{color:#1890ff}</style>
 </head>
 <body>
     <h1>🎓 慧学通 (HuiXueTong)</h1>
-    <p>中职计算机专业学情智能分析信息系统</p>
-    
-    <div class="status">
-        <h3>✅ 系统已成功启动</h3>
-        <p>后端服务运行正常，API接口可用</p>
-    </div>
-    
-    <div class="api-test">
-        <h3>API 测试</h3>
-        <button onclick="testHealth()">测试健康检查</button>
-        <button onclick="testProfile()">获取学生画像</button>
-        <button onclick="testWarnings()">查看预警列表</button>
-        <div id="result">点击按钮测试API...</div>
-    </div>
-    
-    <script>
-        async function testHealth() {
-            try {
-                const res = await fetch('/health');
-                const data = await res.json();
-                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-            } catch (e) {
-                document.getElementById('result').innerText = '错误：' + e.message;
-            }
-        }
-        
-        async function testProfile() {
-            try {
-                const res = await fetch('/api/profile/test-uuid-123');
-                const data = await res.json();
-                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-            } catch (e) {
-                document.getElementById('result').innerText = '错误：' + e.message;
-            }
-        }
-        
-        async function testWarnings() {
-            try {
-                const res = await fetch('/api/warnings');
-                const data = await res.json();
-                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-            } catch (e) {
-                document.getElementById('result').innerText = '错误：' + e.message;
-            }
-        }
-    </script>
+    <p>系统已启动，API 接口可用</p>
+    <p><a href="/health">健康检查</a> | <a href="/api/profile/test">学生画像</a> | <a href="/api/warnings">预警列表</a></p>
 </body>
 </html>
-EOF
+HTMLEOF
+fi
 echo "✅ 前端占位页面已创建"
 
 echo ""
@@ -132,9 +82,15 @@ echo ""
 echo "📍 访问地址：http://localhost"
 echo ""
 echo "📋 常用命令："
-echo "  查看日志：docker compose logs -f backend"
-echo "  停止服务：docker compose down"
-echo "  重启服务：docker compose restart"
+if docker compose version &> /dev/null; then
+    echo "  查看日志：docker compose logs -f backend"
+    echo "  停止服务：docker compose down"
+    echo "  重启服务：docker compose restart"
+else
+    echo "  查看日志：docker-compose logs -f backend"
+    echo "  停止服务：docker-compose down"
+    echo "  重启服务：docker-compose restart"
+fi
 echo ""
 echo "🔧 如需修改配置，请编辑：src/deploy/.env"
 echo ""

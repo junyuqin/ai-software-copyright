@@ -1,6 +1,6 @@
 """
 慧学通 (HuiXueTong) - 数据融合工具模块
-功能：三维能力得分计算、数据清洗、SHA-256脱敏
+功能：三维能力得分计算、数据清洗、SHA-256 脱敏
 申报映射：多源数据融合与三维画像计算/有效性/数据分析
 """
 
@@ -29,7 +29,7 @@ WEIGHTS = {
 
 def calc_3d_scores(data: Dict[str, Any], weights: Dict = None) -> Tuple[float, float, float]:
     """
-    计算学生知识-技能-素养三维能力得分
+    计算学生知识 - 技能 - 素养三维能力得分
     
     计算公式（符合中职教育评价标准）：
     - knowledge = 0.5*quiz_avg + 0.3*attendance*100 + 12
@@ -42,10 +42,10 @@ def calc_3d_scores(data: Dict[str, Any], weights: Dict = None) -> Tuple[float, f
             - attendance: 出勤率 (0-1)
             - debug_success: 调试成功率 (0-1)
             - project_score: 项目评分 (0-100)
-            - pep8_score: PEP8规范得分 (0-100)
+            - pep8_score: PEP8 规范得分 (0-100)
     
     返回：
-        (knowledge, skill, literacy) 三元组，保留1位小数
+        (knowledge, skill, literacy) 三元组，保留 1 位小数
     """
     # 使用默认权重或传入的权重
     if weights is None:
@@ -91,23 +91,23 @@ def calc_3d_scores(data: Dict[str, Any], weights: Dict = None) -> Tuple[float, f
 
 def hash_student_id(uid: str) -> str:
     """
-    对学生标识进行SHA-256哈希脱敏
+    对学生标识进行 SHA-256 哈希脱敏
     符合《个人信息保护法》与教育数据安全规范
     
     参数：
-        uid: 原始学生ID（学号/用户ID）
+        uid: 原始学生 ID（学号/用户 ID）
     
     返回：
-        SHA-256哈希值（16进制字符串，前8位用于展示）
+        SHA-256 哈希值（16 进制字符串，前 16 位用于展示）
     """
     if not uid:
         return ""
     
-    # SHA-256哈希
+    # SHA-256 哈希
     hash_obj = hashlib.sha256(uid.encode('utf-8'))
     full_hash = hash_obj.hexdigest()
     
-    # 返回前16位用于系统内部标识（兼顾安全性与可读性）
+    # 返回前 16 位用于系统内部标识（兼顾安全性与可读性）
     return full_hash[:16]
 
 
@@ -118,7 +118,7 @@ def sanitize_data(data: Dict[str, Any], sensitive_fields: list = None) -> Dict[s
     
     参数：
         data: 原始数据字典
-        sensitive_fields: 需要脱敏的字段列表，默认['student_id', 'uuid']
+        sensitive_fields: 需要脱敏的字段列表，默认 ['student_id', 'uuid']
     
     返回：
         脱敏后的数据字典
@@ -143,7 +143,7 @@ def validate_behavior_data(data: Dict[str, Any]) -> bool:
         data: 待验证的行为数据字典
     
     返回：
-        True表示数据有效，False表示数据无效
+        True 表示数据有效，False 表示数据无效
     """
     required_fields = {
         'quiz_avg': (int, float),
